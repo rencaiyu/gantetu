@@ -17,19 +17,37 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+/**
+ * 甘特图导出控制器。
+ * <p>
+ * 提供 HTTP 接口接收导出参数，构建样式配置，并将生成的 Excel 作为附件流式返回。
+ */
 @RestController
 @RequestMapping("/api/gantt")
 @RequiredArgsConstructor
 public class GanttExportController {
 
+    /**
+     * 导出服务。
+     */
     private final GanttExportService ganttExportService;
 
+    /**
+     * 导出甘特图 Excel。
+     *
+     * @param request  导出请求（标题、明细、颜色与字号配置）
+     * @param response HTTP 响应对象
+     * @throws IOException 写出响应流时可能抛出 IO 异常
+     */
     @PostMapping("/export")
-    public void export(@RequestBody GanttExportRequest request, HttpServletResponse response) throws IOException {
-        String fileName = URLEncoder.encode("gantt-chart", StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+    public void export(@RequestBody GanttExportRequest request,
+                       HttpServletResponse response) throws IOException {
+        String fileName = URLEncoder.encode("gantt-chart", StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
-        response.setHeader("Content-disposition", "attachment;filename*=utf-8''" + fileName + ".xlsx");
+        response.setHeader("Content-disposition",
+                "attachment;filename*=utf-8''" + fileName + ".xlsx");
 
         GanttHeaderStyleConfig style = GanttHeaderStyleConfig.builder()
                 .titleFontSize(request.getTitleFontSize() == null ? 16 : request.getTitleFontSize())
@@ -43,6 +61,15 @@ public class GanttExportController {
         ganttExportService.export(response.getOutputStream(), request.getTitle(), request.getDetails(), style);
     }
 
+    /**
+     * 将字符串颜色名转换为 Apache POI 颜色索引。
+     * <p>
+     * 示例输入：DARK_BLUE、WHITE、GREY_50_PERCENT。
+     *
+     * @param colorName    颜色名称
+     * @param defaultColor 默认颜色索引（当 colorName 为空或非法时使用）
+     * @return 颜色索引
+     */
     private short parseColor(String colorName, short defaultColor) {
         if (colorName == null || colorName.isBlank()) {
             return defaultColor;
@@ -54,17 +81,34 @@ public class GanttExportController {
         }
     }
 
+    /**
+     * 导出请求体。
+     */
     @Data
     public static class GanttExportRequest {
+
+        /** 甘特图标题。 */
         private String title = "Well Progress Gantt Chart";
+
+        /** 甘特图步骤明细列表。 */
         private List<GanttChartOfWellProgressDetail> details;
 
-        // 可选：IndexedColors 名称，如 DARK_BLUE、WHITE、GREY_50_PERCENT
+        /** 标题字号（可选）。 */
         private Short titleFontSize;
+
+        /** 标题字体颜色（可选，IndexedColors 名称）。 */
         private String titleFontColor;
+
+        /** 标题背景颜色（可选，IndexedColors 名称）。 */
         private String titleBgColor;
+
+        /** 表头字号（可选）。 */
         private Short headerFontSize;
+
+        /** 表头字体颜色（可选，IndexedColors 名称）。 */
         private String headerFontColor;
+
+        /** 表头背景颜色（可选，IndexedColors 名称）。 */
         private String headerBgColor;
     }
 }
