@@ -256,6 +256,14 @@ public class GanttExcelExporter {
             if (titleRow != null) {
                 titleRow.setHeightInPoints(styleConfig.getTitleRowHeight());
             }
+            Row levelOneHeaderRow = sheet.getRow(1);
+            if (levelOneHeaderRow != null) {
+                levelOneHeaderRow.setHeightInPoints(styleConfig.getLevelOneHeaderRowHeight());
+            }
+            Row levelTwoHeaderRow = sheet.getRow(2);
+            if (levelTwoHeaderRow != null) {
+                levelTwoHeaderRow.setHeightInPoints(styleConfig.getLevelTwoHeaderRowHeight());
+            }
 
             // 一级/二级表头列宽
             for (int i = 0; i < BASE_INFO_COLUMN_COUNT; i++) {

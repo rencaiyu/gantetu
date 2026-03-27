@@ -24,6 +24,7 @@
   - 实际区间填充红色
 - 前两行标题字体大小/字体颜色/背景色支持自定义（请求参数可选）
 - 标题行高度支持自定义（请求参数可选）
+- 一级/二级表头行高支持自定义（请求参数可选）
 - 一级/二级表头列宽支持自定义（请求参数可选）
 
 ## MySQL + MyBatis-Plus 集成
@@ -71,6 +72,8 @@ CREATE TABLE IF NOT EXISTS gantt_step_detail (
   "titleBgColor": "DARK_BLUE",
   "titleRowHeight": 28,
   "headerFontSize": 11,
+  "levelOneHeaderRowHeight": 22,
+  "levelTwoHeaderRowHeight": 18,
   "headerFontColor": "WHITE",
   "headerBgColor": "GREY_50_PERCENT",
   "levelOneHeaderWidth": 14,
@@ -80,4 +83,5 @@ CREATE TABLE IF NOT EXISTS gantt_step_detail (
 
 > 颜色请使用 `IndexedColors` 枚举名（如 `RED`、`DARK_BLUE`、`GREY_50_PERCENT`）。
 >
-> `titleRowHeight` 单位为 point；`levelOneHeaderWidth`、`levelTwoHeaderWidth` 单位为“字符宽度”。
+> `titleRowHeight`、`levelOneHeaderRowHeight`、`levelTwoHeaderRowHeight` 单位为 point；
+> `levelOneHeaderWidth`、`levelTwoHeaderWidth` 单位为“字符宽度”。
