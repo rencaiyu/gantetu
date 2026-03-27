@@ -17,12 +17,33 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.*;
 
+/**
+ * 甘特图 Excel 导出核心实现。
+ * <p>
+ * 该类负责：
+ * 1) 根据计划/实际日期自动构建时间轴；
+ * 2) 组装导出的二维表格数据；
+ * 3) 通过 EasyExcel 的 Sheet/Cell 回调完成单元格合并、样式与区间填色。
+ */
 public class GanttExcelExporter {
 
+    /** 基础信息列数：Phase、Type、Start、End。 */
     private static final int BASE_INFO_COLUMN_COUNT = 4;
+
+    /** 表头行数：标题行 + 月份行 + 天行。 */
     private static final int HEADER_ROWS = 3;
+
+    /** 日期展示格式。 */
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
+    /**
+     * 执行甘特图导出。
+     *
+     * @param outputStream 输出流
+     * @param title        标题
+     * @param details      业务明细数据
+     * @param styleConfig  样式配置
+     */
     public void export(OutputStream outputStream,
                        String title,
                        List<GanttChartOfWellProgressDetail> details,
@@ -42,16 +63,21 @@ public class GanttExcelExporter {
                 .doWrite(rows);
     }
 
+    /**
+     * 组装写入 Excel 的内容行。
+     */
     private List<List<String>> buildRows(String title,
                                          List<GanttChartOfWellProgressDetail> details,
                                          TimelineContext timelineContext) {
         int totalColumns = BASE_INFO_COLUMN_COUNT + timelineContext.totalDays;
         List<List<String>> rows = new ArrayList<>();
 
+        // 第 0 行：总标题
         List<String> row0 = blankRow(totalColumns);
         row0.set(0, title);
         rows.add(row0);
 
+        // 第 1 行：固定字段 + 月份标签
         List<String> row1 = blankRow(totalColumns);
         row1.set(0, "Phase");
         row1.set(1, "Type");
@@ -62,12 +88,15 @@ public class GanttExcelExporter {
         }
         rows.add(row1);
 
+        // 第 2 行：每天的日号（1~31）
         List<String> row2 = blankRow(totalColumns);
         for (int i = 0; i < timelineContext.totalDays; i++) {
-            row2.set(BASE_INFO_COLUMN_COUNT + i, String.valueOf(timelineContext.start.plusDays(i).getDayOfMonth()));
+            row2.set(BASE_INFO_COLUMN_COUNT + i,
+                    String.valueOf(timelineContext.start.plusDays(i).getDayOfMonth()));
         }
         rows.add(row2);
 
+        // 从第 3 行开始，每个阶段两行：计划行 + 实际行
         for (GanttChartOfWellProgressDetail detail : details) {
             List<String> planRow = blankRow(totalColumns);
             planRow.set(0, detail.getPhase());
@@ -85,10 +114,14 @@ public class GanttExcelExporter {
         return rows;
     }
 
+    /** 将日期格式化为 yyyy-MM-dd 字符串。 */
     private String format(Date date) {
         return date == null ? "" : DATE_FORMAT.format(date);
     }
 
+    /**
+     * 构造空白行，长度等于总列数。
+     */
     private List<String> blankRow(int totalColumns) {
         List<String> row = new ArrayList<>(totalColumns);
         for (int i = 0; i < totalColumns; i++) {
@@ -97,12 +130,24 @@ public class GanttExcelExporter {
         return row;
     }
 
+    /**
+     * 从业务明细中计算时间轴。
+     * <p>
+     * 时间轴规则：
+     * - 起点取最早日期所在月的 1 号；
+     * - 终点取最晚日期所在月的最后一天；
+     * - 生成每月区间（偏移起止）供表头合并使用。
+     */
     private TimelineContext buildTimeline(List<GanttChartOfWellProgressDetail> details) {
         LocalDate minDate = null;
         LocalDate maxDate = null;
 
         for (GanttChartOfWellProgressDetail detail : details) {
-            for (Date date : List.of(detail.getPlanStartDate(), detail.getPlanEndDate(), detail.getActualStartDate(), detail.getActualEndDate())) {
+            for (Date date : List.of(
+                    detail.getPlanStartDate(),
+                    detail.getPlanEndDate(),
+                    detail.getActualStartDate(),
+                    detail.getActualEndDate())) {
                 if (date == null) {
                     continue;
                 }
@@ -125,7 +170,9 @@ public class GanttExcelExporter {
         while (!cursor.isAfter(last)) {
             LocalDate first = cursor.atDay(1);
             LocalDate monthStart = first.isBefore(timelineStart) ? timelineStart : first;
-            LocalDate monthEnd = cursor.atEndOfMonth().isAfter(timelineEnd) ? timelineEnd : cursor.atEndOfMonth();
+            LocalDate monthEnd = cursor.atEndOfMonth().isAfter(timelineEnd)
+                    ? timelineEnd
+                    : cursor.atEndOfMonth();
             int offset = (int) (monthStart.toEpochDay() - timelineStart.toEpochDay());
             int endOffset = (int) (monthEnd.toEpochDay() - timelineStart.toEpochDay());
             monthSpans.add(new MonthSpan(cursor.toString(), offset, endOffset));
@@ -135,29 +182,55 @@ public class GanttExcelExporter {
         return new TimelineContext(timelineStart, timelineEnd, days, monthSpans);
     }
 
+    /**
+     * 单个月份在时间轴中的跨度信息。
+     *
+     * @param label       月份标签（yyyy-MM）
+     * @param startOffset 月份起点相对于时间轴起点的偏移
+     * @param endOffset   月份终点相对于时间轴起点的偏移
+     */
     private record MonthSpan(String label, int startOffset, int endOffset) {
     }
 
+    /**
+     * 时间轴上下文。
+     *
+     * @param start     轴起点
+     * @param end       轴终点
+     * @param totalDays 总天数
+     * @param monthSpans 月度跨度集合
+     */
     private record TimelineContext(LocalDate start, LocalDate end, int totalDays, List<MonthSpan> monthSpans) {
     }
 
+    /**
+     * Sheet 级处理器：负责合并单元格、冻结窗格、设置列宽。
+     */
     private static final class GanttSheetHandler implements SheetWriteHandler {
         private final List<GanttChartOfWellProgressDetail> details;
         private final TimelineContext timelineContext;
 
-        private GanttSheetHandler(List<GanttChartOfWellProgressDetail> details, TimelineContext timelineContext) {
+        private GanttSheetHandler(List<GanttChartOfWellProgressDetail> details,
+                                  TimelineContext timelineContext) {
             this.details = details;
             this.timelineContext = timelineContext;
         }
 
         @Override
-        public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
+        public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder,
+                                     WriteSheetHolder writeSheetHolder) {
             Sheet sheet = writeSheetHolder.getSheet();
             int lastColumn = BASE_INFO_COLUMN_COUNT + timelineContext.totalDays - 1;
+
+            // 标题横跨全列
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, lastColumn));
+
+            // 前 4 列头（Phase/Type/Start/End）在第 1~2 行纵向合并
             for (int col = 0; col < BASE_INFO_COLUMN_COUNT; col++) {
                 sheet.addMergedRegion(new CellRangeAddress(1, 2, col, col));
             }
+
+            // 月份行按月份跨度横向合并
             for (MonthSpan monthSpan : timelineContext.monthSpans) {
                 sheet.addMergedRegion(new CellRangeAddress(
                         1,
@@ -165,11 +238,17 @@ public class GanttExcelExporter {
                         BASE_INFO_COLUMN_COUNT + monthSpan.startOffset,
                         BASE_INFO_COLUMN_COUNT + monthSpan.endOffset));
             }
+
+            // 每个阶段的 Plan/Actual 两行，Phase 列纵向合并
             for (int i = 0; i < details.size(); i++) {
                 int startRow = HEADER_ROWS + i * 2;
                 sheet.addMergedRegion(new CellRangeAddress(startRow, startRow + 1, 0, 0));
             }
+
+            // 冻结基础信息列与表头
             sheet.createFreezePane(BASE_INFO_COLUMN_COUNT, HEADER_ROWS);
+
+            // 固定列宽
             sheet.setColumnWidth(0, 22 * 256);
             sheet.setColumnWidth(1, 10 * 256);
             sheet.setColumnWidth(2, 14 * 256);
@@ -180,10 +259,20 @@ public class GanttExcelExporter {
         }
     }
 
+    /**
+     * Cell 级处理器：按行/列位置应用样式，并对日期区间进行填色。
+     */
     private static final class GanttCellHandler implements CellWriteHandler {
 
+        /**
+         * 行号到区间定义的映射（用于快速判断某单元格是否命中计划/实际区间）。
+         */
         private final Map<Integer, RowTypeRange> rowRangeMap = new HashMap<>();
+
+        /** 时间轴上下文。 */
         private final TimelineContext timelineContext;
+
+        /** 颜色/字号配置。 */
         private final GanttHeaderStyleConfig styleConfig;
 
         private CellStyle titleStyle;
@@ -198,12 +287,20 @@ public class GanttExcelExporter {
                                  GanttHeaderStyleConfig styleConfig) {
             this.timelineContext = timelineContext;
             this.styleConfig = styleConfig;
+
+            // 预计算每行对应的时间范围，避免逐单元格重复解析。
             for (int i = 0; i < details.size(); i++) {
                 int planRow = HEADER_ROWS + i * 2;
                 int actualRow = planRow + 1;
                 GanttChartOfWellProgressDetail detail = details.get(i);
-                rowRangeMap.put(planRow, new RowTypeRange(true, toLocalDate(detail.getPlanStartDate()), toLocalDate(detail.getPlanEndDate())));
-                rowRangeMap.put(actualRow, new RowTypeRange(false, toLocalDate(detail.getActualStartDate()), toLocalDate(detail.getActualEndDate())));
+                rowRangeMap.put(planRow, new RowTypeRange(
+                        true,
+                        toLocalDate(detail.getPlanStartDate()),
+                        toLocalDate(detail.getPlanEndDate())));
+                rowRangeMap.put(actualRow, new RowTypeRange(
+                        false,
+                        toLocalDate(detail.getActualStartDate()),
+                        toLocalDate(detail.getActualEndDate())));
             }
         }
 
@@ -219,19 +316,23 @@ public class GanttExcelExporter {
             int row = cell.getRowIndex();
             int col = cell.getColumnIndex();
 
+            // 标题行样式
             if (row == 0) {
                 cell.setCellStyle(titleStyle);
                 return;
             }
+            // 月份/字段名行样式
             if (row == 1) {
                 cell.setCellStyle(headerStyle);
                 return;
             }
+            // 天数行样式
             if (row == 2) {
                 cell.setCellStyle(dayHeaderStyle);
                 return;
             }
 
+            // 左侧基础信息列
             if (col < BASE_INFO_COLUMN_COUNT) {
                 cell.setCellStyle(bodyStyle);
                 return;
@@ -242,8 +343,11 @@ public class GanttExcelExporter {
                 cell.setCellStyle(bodyStyle);
                 return;
             }
+
+            // 根据列计算当前日期，判断是否处于区间内
             LocalDate thisDate = timelineContext.start.plusDays(col - BASE_INFO_COLUMN_COUNT);
-            boolean inRange = !thisDate.isBefore(rowTypeRange.start) && !thisDate.isAfter(rowTypeRange.end);
+            boolean inRange = !thisDate.isBefore(rowTypeRange.start)
+                    && !thisDate.isAfter(rowTypeRange.end);
             if (inRange) {
                 cell.setCellStyle(rowTypeRange.plan ? planFillStyle : actualFillStyle);
             } else {
@@ -251,19 +355,51 @@ public class GanttExcelExporter {
             }
         }
 
+        /** 延迟初始化样式，避免重复创建对象。 */
         private void initStylesIfNeeded(Workbook workbook) {
             if (titleStyle != null) {
                 return;
             }
-            titleStyle = createBaseStyle(workbook, styleConfig.getTitleBgColor(), styleConfig.getTitleFontColor(), styleConfig.getTitleFontSize(), true);
-            headerStyle = createBaseStyle(workbook, styleConfig.getHeaderBgColor(), styleConfig.getHeaderFontColor(), styleConfig.getHeaderFontSize(), true);
-            dayHeaderStyle = createBaseStyle(workbook, styleConfig.getHeaderBgColor(), styleConfig.getHeaderFontColor(), styleConfig.getHeaderFontSize(), false);
-            bodyStyle = createBaseStyle(workbook, IndexedColors.WHITE.getIndex(), IndexedColors.BLACK.getIndex(), (short) 10, false);
-            planFillStyle = createBaseStyle(workbook, IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex(), IndexedColors.BLACK.getIndex(), (short) 10, false);
-            actualFillStyle = createBaseStyle(workbook, IndexedColors.ROSE.getIndex(), IndexedColors.BLACK.getIndex(), (short) 10, false);
+            titleStyle = createBaseStyle(workbook,
+                    styleConfig.getTitleBgColor(),
+                    styleConfig.getTitleFontColor(),
+                    styleConfig.getTitleFontSize(),
+                    true);
+            headerStyle = createBaseStyle(workbook,
+                    styleConfig.getHeaderBgColor(),
+                    styleConfig.getHeaderFontColor(),
+                    styleConfig.getHeaderFontSize(),
+                    true);
+            dayHeaderStyle = createBaseStyle(workbook,
+                    styleConfig.getHeaderBgColor(),
+                    styleConfig.getHeaderFontColor(),
+                    styleConfig.getHeaderFontSize(),
+                    false);
+            bodyStyle = createBaseStyle(workbook,
+                    IndexedColors.WHITE.getIndex(),
+                    IndexedColors.BLACK.getIndex(),
+                    (short) 10,
+                    false);
+            planFillStyle = createBaseStyle(workbook,
+                    IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex(),
+                    IndexedColors.BLACK.getIndex(),
+                    (short) 10,
+                    false);
+            actualFillStyle = createBaseStyle(workbook,
+                    IndexedColors.ROSE.getIndex(),
+                    IndexedColors.BLACK.getIndex(),
+                    (short) 10,
+                    false);
         }
 
-        private CellStyle createBaseStyle(Workbook workbook, short bgColor, short fontColor, short fontSize, boolean bold) {
+        /**
+         * 创建统一基础样式（边框、对齐、背景、字体）。
+         */
+        private CellStyle createBaseStyle(Workbook workbook,
+                                          short bgColor,
+                                          short fontColor,
+                                          short fontSize,
+                                          boolean bold) {
             CellStyle cellStyle = workbook.createCellStyle();
             cellStyle.setFillForegroundColor(bgColor);
             cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
@@ -282,6 +418,9 @@ public class GanttExcelExporter {
             return cellStyle;
         }
 
+        /**
+         * 将 Date 转换为系统时区下的 LocalDate。
+         */
         private LocalDate toLocalDate(Date date) {
             if (date == null) {
                 return null;
@@ -289,6 +428,13 @@ public class GanttExcelExporter {
             return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         }
 
+        /**
+         * 行类型与日期区间定义。
+         *
+         * @param plan  是否计划行（true=Plan, false=Actual）
+         * @param start 区间开始日期
+         * @param end   区间结束日期
+         */
         private record RowTypeRange(boolean plan, LocalDate start, LocalDate end) {
         }
     }
