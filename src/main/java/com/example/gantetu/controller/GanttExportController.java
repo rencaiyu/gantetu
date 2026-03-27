@@ -59,9 +59,12 @@ public class GanttExportController {
                 .titleFontSize(request.getTitleFontSize() == null ? 16 : request.getTitleFontSize())
                 .titleBgColor(parseColor(request.getTitleBgColor(), IndexedColors.DARK_BLUE.getIndex()))
                 .titleFontColor(parseColor(request.getTitleFontColor(), IndexedColors.WHITE.getIndex()))
+                .titleRowHeight(request.getTitleRowHeight() == null ? 28f : request.getTitleRowHeight())
                 .headerFontSize(request.getHeaderFontSize() == null ? 11 : request.getHeaderFontSize())
                 .headerBgColor(parseColor(request.getHeaderBgColor(), IndexedColors.GREY_50_PERCENT.getIndex()))
                 .headerFontColor(parseColor(request.getHeaderFontColor(), IndexedColors.WHITE.getIndex()))
+                .levelOneHeaderWidth(toExcelColumnWidth(request.getLevelOneHeaderWidth(), 14))
+                .levelTwoHeaderWidth(toExcelColumnWidth(request.getLevelTwoHeaderWidth(), 4))
                 .build();
 
         ganttExportService.exportByWellId(response.getOutputStream(), request.getTitle(), request.getWellId(), style);
@@ -85,6 +88,14 @@ public class GanttExportController {
         } catch (IllegalArgumentException ex) {
             return defaultColor;
         }
+    }
+
+    /**
+     * 将前端传入的字符宽度转换为 Excel 列宽单位。
+     */
+    private int toExcelColumnWidth(Integer widthInChars, int defaultChars) {
+        int chars = (widthInChars == null || widthInChars <= 0) ? defaultChars : widthInChars;
+        return chars * 256;
     }
 
     /**
@@ -112,6 +123,9 @@ public class GanttExportController {
         /** 标题背景颜色（可选，IndexedColors 名称）。 */
         private String titleBgColor;
 
+        /** 标题行高度（可选，单位 point）。 */
+        private Float titleRowHeight;
+
         /** 表头字号（可选）。 */
         private Short headerFontSize;
 
@@ -120,5 +134,11 @@ public class GanttExportController {
 
         /** 表头背景颜色（可选，IndexedColors 名称）。 */
         private String headerBgColor;
+
+        /** 一级表头列宽（可选，单位字符，作用于 Phase/Type/Start/End 列）。 */
+        private Integer levelOneHeaderWidth;
+
+        /** 二级表头列宽（可选，单位字符，作用于时间轴日列）。 */
+        private Integer levelTwoHeaderWidth;
     }
 }

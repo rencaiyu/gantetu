@@ -57,7 +57,7 @@ public class GanttExcelExporter {
 
         EasyExcel.write(outputStream)
                 .needHead(false)
-                .registerWriteHandler(new GanttSheetHandler(details, timelineContext))
+                .registerWriteHandler(new GanttSheetHandler(details, timelineContext, styleConfig))
                 .registerWriteHandler(new GanttCellHandler(details, timelineContext, styleConfig))
                 .sheet("Gantt")
                 .doWrite(rows);
@@ -209,11 +209,14 @@ public class GanttExcelExporter {
     private static final class GanttSheetHandler implements SheetWriteHandler {
         private final List<GanttChartOfWellProgressDetail> details;
         private final TimelineContext timelineContext;
+        private final GanttHeaderStyleConfig styleConfig;
 
         private GanttSheetHandler(List<GanttChartOfWellProgressDetail> details,
-                                  TimelineContext timelineContext) {
+                                  TimelineContext timelineContext,
+                                  GanttHeaderStyleConfig styleConfig) {
             this.details = details;
             this.timelineContext = timelineContext;
+            this.styleConfig = styleConfig;
         }
 
         @Override
@@ -248,13 +251,18 @@ public class GanttExcelExporter {
             // 冻结基础信息列与表头
             sheet.createFreezePane(BASE_INFO_COLUMN_COUNT, HEADER_ROWS);
 
-            // 固定列宽
-            sheet.setColumnWidth(0, 22 * 256);
-            sheet.setColumnWidth(1, 10 * 256);
-            sheet.setColumnWidth(2, 14 * 256);
-            sheet.setColumnWidth(3, 14 * 256);
+            // 标题行高度
+            Row titleRow = sheet.getRow(0);
+            if (titleRow != null) {
+                titleRow.setHeightInPoints(styleConfig.getTitleRowHeight());
+            }
+
+            // 一级/二级表头列宽
+            for (int i = 0; i < BASE_INFO_COLUMN_COUNT; i++) {
+                sheet.setColumnWidth(i, styleConfig.getLevelOneHeaderWidth());
+            }
             for (int i = BASE_INFO_COLUMN_COUNT; i <= lastColumn; i++) {
-                sheet.setColumnWidth(i, 4 * 256);
+                sheet.setColumnWidth(i, styleConfig.getLevelTwoHeaderWidth());
             }
         }
     }
