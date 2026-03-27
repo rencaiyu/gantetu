@@ -143,11 +143,13 @@ public class GanttExcelExporter {
         LocalDate maxDate = null;
 
         for (GanttChartOfWellProgressDetail detail : details) {
-            for (Date date : List.of(
+            Date[] dates = {
                     detail.getPlanStartDate(),
                     detail.getPlanEndDate(),
                     detail.getActualStartDate(),
-                    detail.getActualEndDate())) {
+                    detail.getActualEndDate()
+            };
+            for (Date date : dates) {
                 if (date == null) {
                     continue;
                 }
@@ -255,6 +257,14 @@ public class GanttExcelExporter {
             Row titleRow = sheet.getRow(0);
             if (titleRow != null) {
                 titleRow.setHeightInPoints(styleConfig.getTitleRowHeight());
+            }
+            Row levelOneHeaderRow = sheet.getRow(1);
+            if (levelOneHeaderRow != null) {
+                levelOneHeaderRow.setHeightInPoints(styleConfig.getLevelOneHeaderRowHeight());
+            }
+            Row levelTwoHeaderRow = sheet.getRow(2);
+            if (levelTwoHeaderRow != null) {
+                levelTwoHeaderRow.setHeightInPoints(styleConfig.getLevelTwoHeaderRowHeight());
             }
 
             // 一级/二级表头列宽
