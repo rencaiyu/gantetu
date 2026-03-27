@@ -7,10 +7,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.IndexedColors;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -35,13 +37,17 @@ public class GanttExportController {
     /**
      * 导出甘特图 Excel。
      *
-     * @param request  导出请求（标题、明细、颜色与字号配置）
+     * @param request  导出请求（标题、井 ID、颜色与字号配置）
      * @param response HTTP 响应对象
      * @throws IOException 写出响应流时可能抛出 IO 异常
      */
     @PostMapping("/export")
     public void export(@RequestBody GanttExportRequest request,
                        HttpServletResponse response) throws IOException {
+        if (request.getWellId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "wellId 不能为空");
+        }
+
         String fileName = URLEncoder.encode("gantt-chart", StandardCharsets.UTF_8)
                 .replaceAll("\\+", "%20");
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -58,7 +64,7 @@ public class GanttExportController {
                 .headerFontColor(parseColor(request.getHeaderFontColor(), IndexedColors.WHITE.getIndex()))
                 .build();
 
-        ganttExportService.export(response.getOutputStream(), request.getTitle(), request.getDetails(), style);
+        ganttExportService.exportByWellId(response.getOutputStream(), request.getTitle(), request.getWellId(), style);
     }
 
     /**
@@ -90,7 +96,11 @@ public class GanttExportController {
         /** 甘特图标题。 */
         private String title = "Well Progress Gantt Chart";
 
-        /** 甘特图步骤明细列表。 */
+        /** 井 ID（用于从数据库查询甘特图步骤明细）。 */
+        private Long wellId;
+
+        /** 兼容历史接口保留字段（已废弃，不再用于导出）。 */
+        @Deprecated
         private List<GanttChartOfWellProgressDetail> details;
 
         /** 标题字号（可选）。 */
