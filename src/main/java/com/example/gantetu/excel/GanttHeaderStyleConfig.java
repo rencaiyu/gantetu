@@ -49,6 +49,18 @@ public class GanttHeaderStyleConfig {
     private short headerFontSize = 11;
 
     /**
+     * 一级表头行高（point，对应月份/字段名行）。
+     */
+    @Builder.Default
+    private float levelOneHeaderRowHeight = 22f;
+
+    /**
+     * 二级表头行高（point，对应日号行）。
+     */
+    @Builder.Default
+    private float levelTwoHeaderRowHeight = 18f;
+
+    /**
      * 一级/二级表头字体颜色（IndexedColors 索引值）。
      */
     @Builder.Default

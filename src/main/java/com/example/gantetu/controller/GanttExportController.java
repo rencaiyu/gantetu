@@ -61,6 +61,8 @@ public class GanttExportController {
                 .titleFontColor(parseColor(request.getTitleFontColor(), IndexedColors.WHITE.getIndex()))
                 .titleRowHeight(request.getTitleRowHeight() == null ? 28f : request.getTitleRowHeight())
                 .headerFontSize(request.getHeaderFontSize() == null ? 11 : request.getHeaderFontSize())
+                .levelOneHeaderRowHeight(request.getLevelOneHeaderRowHeight() == null ? 22f : request.getLevelOneHeaderRowHeight())
+                .levelTwoHeaderRowHeight(request.getLevelTwoHeaderRowHeight() == null ? 18f : request.getLevelTwoHeaderRowHeight())
                 .headerBgColor(parseColor(request.getHeaderBgColor(), IndexedColors.GREY_50_PERCENT.getIndex()))
                 .headerFontColor(parseColor(request.getHeaderFontColor(), IndexedColors.WHITE.getIndex()))
                 .levelOneHeaderWidth(toExcelColumnWidth(request.getLevelOneHeaderWidth(), 14))
@@ -128,6 +130,12 @@ public class GanttExportController {
 
         /** 表头字号（可选）。 */
         private Short headerFontSize;
+
+        /** 一级表头行高（可选，单位 point，作用于月份/字段名行）。 */
+        private Float levelOneHeaderRowHeight;
+
+        /** 二级表头行高（可选，单位 point，作用于日号行）。 */
+        private Float levelTwoHeaderRowHeight;
 
         /** 表头字体颜色（可选，IndexedColors 名称）。 */
         private String headerFontColor;
