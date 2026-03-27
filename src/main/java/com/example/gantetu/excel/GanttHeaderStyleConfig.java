@@ -14,6 +14,11 @@ import org.apache.poi.ss.usermodel.IndexedColors;
 public class GanttHeaderStyleConfig {
 
     /**
+     * Excel 宽度单位换算常量（1 个字符宽度 = 256 单位）。
+     */
+    private static final int EXCEL_WIDTH_UNIT = 256;
+
+    /**
      * 标题字号。
      */
     @Builder.Default
@@ -32,6 +37,12 @@ public class GanttHeaderStyleConfig {
     private short titleBgColor = IndexedColors.DARK_BLUE.getIndex();
 
     /**
+     * 标题行高度（point）。
+     */
+    @Builder.Default
+    private float titleRowHeight = 28f;
+
+    /**
      * 一级/二级表头字号。
      */
     @Builder.Default
@@ -48,6 +59,18 @@ public class GanttHeaderStyleConfig {
      */
     @Builder.Default
     private short headerBgColor = IndexedColors.GREY_50_PERCENT.getIndex();
+
+    /**
+     * 一级表头列宽（字符数，应用于 Phase/Type/Start/End 列）。
+     */
+    @Builder.Default
+    private int levelOneHeaderWidth = 14 * EXCEL_WIDTH_UNIT;
+
+    /**
+     * 二级表头列宽（字符数，应用于时间轴日列）。
+     */
+    @Builder.Default
+    private int levelTwoHeaderWidth = 4 * EXCEL_WIDTH_UNIT;
 
     /**
      * 获取默认样式配置。
