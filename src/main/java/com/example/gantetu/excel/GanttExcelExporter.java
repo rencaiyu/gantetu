@@ -311,11 +311,11 @@ public class GanttExcelExporter {
                 int planRow = HEADER_ROWS + i * 2;
                 int actualRow = planRow + 1;
                 GanttChartOfWellProgressDetail detail = details.get(i);
-                rowRangeMap.put(planRow, new RowTypeRange(
+                rowRangeMap.put(planRow, buildRowTypeRange(
                         true,
                         toLocalDate(detail.getPlanStartDate()),
                         toLocalDate(detail.getPlanEndDate())));
-                rowRangeMap.put(actualRow, new RowTypeRange(
+                rowRangeMap.put(actualRow, buildRowTypeRange(
                         false,
                         toLocalDate(detail.getActualStartDate()),
                         toLocalDate(detail.getActualEndDate())));
@@ -444,6 +444,29 @@ public class GanttExcelExporter {
                 return null;
             }
             return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+
+        /**
+         * 构建行区间：
+         * - 若仅有开始或结束日期，则按单天区间渲染；
+         * - 若起止颠倒，则自动交换，避免区间判断失败。
+         */
+        private RowTypeRange buildRowTypeRange(boolean plan, LocalDate start, LocalDate end) {
+            if (start == null && end == null) {
+                return new RowTypeRange(plan, null, null);
+            }
+            if (start == null) {
+                start = end;
+            }
+            if (end == null) {
+                end = start;
+            }
+            if (start.isAfter(end)) {
+                LocalDate temp = start;
+                start = end;
+                end = temp;
+            }
+            return new RowTypeRange(plan, start, end);
         }
 
         /**
