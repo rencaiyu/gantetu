@@ -5,6 +5,7 @@ import com.alibaba.excel.write.handler.CellWriteHandler;
 import com.alibaba.excel.write.handler.SheetWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
+import com.alibaba.excel.write.metadata.holder.WriteWorkbookHolder;
 import com.example.gantetu.dto.GanttChartOfWellProgressDetail;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -150,7 +151,7 @@ public class GanttExcelExporter {
         }
 
         @Override
-        public void afterSheetCreate(WriteSheetHolder writeSheetHolder) {
+        public void afterSheetCreate(WriteWorkbookHolder writeWorkbookHolder, WriteSheetHolder writeSheetHolder) {
             Sheet sheet = writeSheetHolder.getSheet();
             int lastColumn = BASE_INFO_COLUMN_COUNT + timelineContext.totalDays - 1;
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, lastColumn));
