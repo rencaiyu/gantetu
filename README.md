@@ -3,6 +3,8 @@
 ## 版本
 - Spring Boot `3.3.5`
 - EasyExcel `3.3.2`
+- MyBatis-Plus `3.5.5`
+- MySQL `8.x`
 
 ## 导出能力
 - 第 1 行：总标题（整行合并）
@@ -22,31 +24,53 @@
   - 实际区间填充红色
 - 前两行标题字体大小/字体颜色/背景色支持自定义（请求参数可选）
 
+## MySQL + MyBatis-Plus 集成
+
+### 1) 配置数据库连接
+在 `src/main/resources/application.yml` 修改你的数据库连接：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/gantetu?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=UTC
+    username: root
+    password: root
+```
+
+### 2) 初始化表结构
+执行 `src/main/resources/db/schema.sql`：
+
+```sql
+CREATE TABLE IF NOT EXISTS gantt_step_detail (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  well_id BIGINT NOT NULL,
+  phase VARCHAR(128) NOT NULL,
+  plan_start_date DATE NOT NULL,
+  plan_end_date DATE NOT NULL,
+  actual_start_date DATE NULL,
+  actual_end_date DATE NULL,
+  sort_order INT NOT NULL DEFAULT 0
+);
+```
+
 ## 接口
 `POST /api/gantt/export`
+
+> 现在导出时会根据 `wellId` 从 MySQL 查询步骤明细列表，不再依赖前端传 `details`。
 
 请求体示例：
 
 ```json
 {
   "title": "Well Progress Gantt Chart",
+  "wellId": 10001,
   "titleFontSize": 16,
   "titleFontColor": "WHITE",
   "titleBgColor": "DARK_BLUE",
   "headerFontSize": 11,
   "headerFontColor": "WHITE",
-  "headerBgColor": "GREY_50_PERCENT",
-  "details": [
-    {
-      "phase": "Drilling",
-      "planStartDate": "2026-03-01",
-      "planEndDate": "2026-03-15",
-      "actualStartDate": "2026-03-03",
-      "actualEndDate": "2026-03-20"
-    }
-  ]
+  "headerBgColor": "GREY_50_PERCENT"
 }
 ```
 
 > 颜色请使用 `IndexedColors` 枚举名（如 `RED`、`DARK_BLUE`、`GREY_50_PERCENT`）。
-
