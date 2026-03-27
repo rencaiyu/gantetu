@@ -143,11 +143,13 @@ public class GanttExcelExporter {
         LocalDate maxDate = null;
 
         for (GanttChartOfWellProgressDetail detail : details) {
-            for (Date date : List.of(
+            Date[] dates = {
                     detail.getPlanStartDate(),
                     detail.getPlanEndDate(),
                     detail.getActualStartDate(),
-                    detail.getActualEndDate())) {
+                    detail.getActualEndDate()
+            };
+            for (Date date : dates) {
                 if (date == null) {
                     continue;
                 }
