@@ -444,7 +444,10 @@ public class GanttExcelExporter {
             CellStyle cellStyle = workbook.createCellStyle();
             cellStyle.setFillForegroundColor(bgColor);
             cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            cellStyle.setAlignment(HorizontalAlignment.CENTER);
+            //水平居中
+//            cellStyle.setAlignment(HorizontalAlignment.CENTER);
+            //左对齐
+            cellStyle.setAlignment(HorizontalAlignment.LEFT);
             cellStyle.setVerticalAlignment(VerticalAlignment.CENTER);
             cellStyle.setBorderTop(BorderStyle.THIN);
             cellStyle.setBorderBottom(BorderStyle.THIN);
