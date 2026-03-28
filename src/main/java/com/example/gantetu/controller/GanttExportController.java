@@ -17,6 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -28,6 +31,9 @@ import java.util.List;
 @RequestMapping("/api/gantt")
 @RequiredArgsConstructor
 public class GanttExportController {
+
+    private static final DateTimeFormatter FILE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final DateTimeFormatter TITLE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'");
 
     /**
      * 导出服务。
@@ -48,7 +54,9 @@ public class GanttExportController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "wellId 不能为空");
         }
 
-        String fileName = URLEncoder.encode("gantt-chart", StandardCharsets.UTF_8)
+        LocalDateTime exportTime = LocalDateTime.now(ZoneOffset.UTC);
+        String timestamp = exportTime.format(FILE_TS_FORMAT);
+        String fileName = URLEncoder.encode("gantt-chart-" + timestamp, StandardCharsets.UTF_8)
                 .replaceAll("\\+", "%20");
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
@@ -69,7 +77,8 @@ public class GanttExportController {
                 .levelTwoHeaderWidth(toExcelColumnWidth(request.getLevelTwoHeaderWidth(), 4))
                 .build();
 
-        ganttExportService.exportByWellId(response.getOutputStream(), request.getTitle(), request.getWellId(), style);
+        String exportTitle = request.getTitle() + " (generated at " + exportTime.format(TITLE_TS_FORMAT) + ")";
+        ganttExportService.exportByWellId(response.getOutputStream(), exportTitle, request.getWellId(), style);
     }
 
     /**
@@ -109,6 +118,8 @@ public class GanttExportController {
      *     <li>twips：例如 3000、2000（1 point = 20 twips）。</li>
      * </ul>
      * 这里兼容 twips：当值超过 Excel 行高上限 409.5 point 时，按 twips 自动换算。
+     * 同时兼容常见“看起来像 twips”的场景（如 200、300、400）：当值 >= 100 且为 10 的整数倍时，
+     * 默认也按 twips 处理（200 -> 10 point）。
      */
     private float normalizeRowHeight(Float rowHeight, float defaultPoint) {
         if (rowHeight == null || rowHeight <= 0) {
@@ -118,7 +129,14 @@ public class GanttExportController {
         if (rowHeight > excelMaxPoint) {
             return rowHeight / 20f;
         }
+        if (rowHeight >= 100f && isAlmostInteger(rowHeight) && ((int) Math.round(rowHeight)) % 10 == 0) {
+            return rowHeight / 20f;
+        }
         return rowHeight;
+    }
+
+    private boolean isAlmostInteger(float value) {
+        return Math.abs(value - Math.round(value)) < 0.0001f;
     }
 
     /**
