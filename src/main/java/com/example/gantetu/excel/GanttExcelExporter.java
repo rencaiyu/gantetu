@@ -16,7 +16,9 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 甘特图 Excel 导出核心实现。
@@ -60,7 +62,7 @@ public class GanttExcelExporter {
                 .needHead(false)
                 .registerWriteHandler(new GanttSheetHandler(details, timelineContext, styleConfig))
                 .registerWriteHandler(new GanttRowHeightHandler(styleConfig))
-                .registerWriteHandler(new GanttCellHandler(details, timelineContext, styleConfig))
+                .registerWriteHandler(new GanttCellHandler(timelineContext, styleConfig))
                 .sheet("Gantt")
                 .doWrite(rows);
     }
@@ -305,11 +307,6 @@ public class GanttExcelExporter {
      */
     private static final class GanttCellHandler implements CellWriteHandler {
 
-        /**
-         * 行号到区间定义的映射（用于快速判断某单元格是否命中计划/实际区间）。
-         */
-        private final Map<Integer, RowTypeRange> rowRangeMap = new HashMap<>();
-
         /** 时间轴上下文。 */
         private final TimelineContext timelineContext;
 
@@ -323,26 +320,10 @@ public class GanttExcelExporter {
         private CellStyle planFillStyle;
         private CellStyle actualFillStyle;
 
-        private GanttCellHandler(List<GanttChartOfWellProgressDetail> details,
-                                 TimelineContext timelineContext,
+        private GanttCellHandler(TimelineContext timelineContext,
                                  GanttHeaderStyleConfig styleConfig) {
             this.timelineContext = timelineContext;
             this.styleConfig = styleConfig;
-
-            // 预计算每行对应的时间范围，避免逐单元格重复解析。
-            for (int i = 0; i < details.size(); i++) {
-                int planRow = HEADER_ROWS + i * 2;
-                int actualRow = planRow + 1;
-                GanttChartOfWellProgressDetail detail = details.get(i);
-                rowRangeMap.put(planRow, buildRowTypeRange(
-                        true,
-                        toLocalDate(detail.getPlanStartDate()),
-                        toLocalDate(detail.getPlanEndDate())));
-                rowRangeMap.put(actualRow, buildRowTypeRange(
-                        false,
-                        toLocalDate(detail.getActualStartDate()),
-                        toLocalDate(detail.getActualEndDate())));
-            }
         }
 
         @Override
@@ -379,7 +360,7 @@ public class GanttExcelExporter {
                 return;
             }
 
-            RowTypeRange rowTypeRange = rowRangeMap.get(row);
+            RowTypeRange rowTypeRange = resolveRowTypeRange(cell.getRow());
             if (rowTypeRange == null || rowTypeRange.start == null || rowTypeRange.end == null) {
                 cell.setCellStyle(bodyStyle);
                 return;
@@ -394,6 +375,24 @@ public class GanttExcelExporter {
             } else {
                 cell.setCellStyle(bodyStyle);
             }
+        }
+
+        /**
+         * 动态解析当前行的开始/结束时间区间。
+         * <p>
+         * 颜色区间严格跟随 Start/End 列值，确保数据调整后填色同步更新。
+         */
+        private RowTypeRange resolveRowTypeRange(Row row) {
+            if (row == null) {
+                return null;
+            }
+            Cell typeCell = row.getCell(1);
+            Cell startCell = row.getCell(2);
+            Cell endCell = row.getCell(3);
+            boolean plan = typeCell != null && "Plan".equalsIgnoreCase(typeCell.getStringCellValue());
+            LocalDate start = toLocalDate(startCell);
+            LocalDate end = toLocalDate(endCell);
+            return buildRowTypeRange(plan, start, end);
         }
 
         /** 延迟初始化样式，避免重复创建对象。 */
@@ -470,6 +469,20 @@ public class GanttExcelExporter {
                 return null;
             }
             return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+
+        private LocalDate toLocalDate(Cell cell) {
+            if (cell == null) {
+                return null;
+            }
+            if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) {
+                return toLocalDate(cell.getDateCellValue());
+            }
+            String value = cell.toString();
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            return LocalDate.parse(value.trim());
         }
 
         /**
