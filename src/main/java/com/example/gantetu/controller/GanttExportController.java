@@ -59,10 +59,10 @@ public class GanttExportController {
                 .titleFontSize(request.getTitleFontSize() == null ? 16 : request.getTitleFontSize())
                 .titleBgColor(parseColor(request.getTitleBgColor(), IndexedColors.DARK_BLUE.getIndex()))
                 .titleFontColor(parseColor(request.getTitleFontColor(), IndexedColors.WHITE.getIndex()))
-                .titleRowHeight(request.getTitleRowHeight() == null ? 28f : request.getTitleRowHeight())
+                .titleRowHeight(normalizeRowHeight(request.getTitleRowHeight(), 28f))
                 .headerFontSize(request.getHeaderFontSize() == null ? 11 : request.getHeaderFontSize())
-                .levelOneHeaderRowHeight(request.getLevelOneHeaderRowHeight() == null ? 22f : request.getLevelOneHeaderRowHeight())
-                .levelTwoHeaderRowHeight(request.getLevelTwoHeaderRowHeight() == null ? 18f : request.getLevelTwoHeaderRowHeight())
+                .levelOneHeaderRowHeight(normalizeRowHeight(request.getLevelOneHeaderRowHeight(), 22f))
+                .levelTwoHeaderRowHeight(normalizeRowHeight(request.getLevelTwoHeaderRowHeight(), 18f))
                 .headerBgColor(parseColor(request.getHeaderBgColor(), IndexedColors.GREY_50_PERCENT.getIndex()))
                 .headerFontColor(parseColor(request.getHeaderFontColor(), IndexedColors.WHITE.getIndex()))
                 .levelOneHeaderWidth(toExcelColumnWidth(request.getLevelOneHeaderWidth(), 14))
@@ -101,6 +101,27 @@ public class GanttExportController {
     }
 
     /**
+     * 规范化行高入参（输出单位：point）。
+     * <p>
+     * 前端常见两种传值方式：
+     * <ul>
+     *     <li>point：例如 28、22、18；</li>
+     *     <li>twips：例如 3000、2000（1 point = 20 twips）。</li>
+     * </ul>
+     * 这里兼容 twips：当值超过 Excel 行高上限 409.5 point 时，按 twips 自动换算。
+     */
+    private float normalizeRowHeight(Float rowHeight, float defaultPoint) {
+        if (rowHeight == null || rowHeight <= 0) {
+            return defaultPoint;
+        }
+        float excelMaxPoint = 409.5f;
+        if (rowHeight > excelMaxPoint) {
+            return rowHeight / 20f;
+        }
+        return rowHeight;
+    }
+
+    /**
      * 导出请求体。
      */
     @Data
@@ -125,16 +146,16 @@ public class GanttExportController {
         /** 标题背景颜色（可选，IndexedColors 名称）。 */
         private String titleBgColor;
 
-        /** 标题行高度（可选，单位 point）。 */
+        /** 标题行高度（可选，单位 point；兼容 twips 入参）。 */
         private Float titleRowHeight;
 
         /** 表头字号（可选）。 */
         private Short headerFontSize;
 
-        /** 一级表头行高（可选，单位 point，作用于月份/字段名行）。 */
+        /** 一级表头行高（可选，单位 point；兼容 twips，作用于月份/字段名行）。 */
         private Float levelOneHeaderRowHeight;
 
-        /** 二级表头行高（可选，单位 point，作用于日号行）。 */
+        /** 二级表头行高（可选，单位 point；兼容 twips，作用于日号行）。 */
         private Float levelTwoHeaderRowHeight;
 
         /** 表头字体颜色（可选，IndexedColors 名称）。 */
