@@ -254,18 +254,12 @@ public class GanttExcelExporter {
             sheet.createFreezePane(BASE_INFO_COLUMN_COUNT, HEADER_ROWS);
 
             // 标题行高度
-            Row titleRow = sheet.getRow(0);
-            if (titleRow != null) {
-                titleRow.setHeightInPoints(styleConfig.getTitleRowHeight());
-            }
-            Row levelOneHeaderRow = sheet.getRow(1);
-            if (levelOneHeaderRow != null) {
-                levelOneHeaderRow.setHeightInPoints(styleConfig.getLevelOneHeaderRowHeight());
-            }
-            Row levelTwoHeaderRow = sheet.getRow(2);
-            if (levelTwoHeaderRow != null) {
-                levelTwoHeaderRow.setHeightInPoints(styleConfig.getLevelTwoHeaderRowHeight());
-            }
+            Row titleRow = getOrCreateRow(sheet, 0);
+            titleRow.setHeightInPoints(styleConfig.getTitleRowHeight());
+            Row levelOneHeaderRow = getOrCreateRow(sheet, 1);
+            levelOneHeaderRow.setHeightInPoints(styleConfig.getLevelOneHeaderRowHeight());
+            Row levelTwoHeaderRow = getOrCreateRow(sheet, 2);
+            levelTwoHeaderRow.setHeightInPoints(styleConfig.getLevelTwoHeaderRowHeight());
 
             // 一级/二级表头列宽
             for (int i = 0; i < BASE_INFO_COLUMN_COUNT; i++) {
@@ -274,6 +268,14 @@ public class GanttExcelExporter {
             for (int i = BASE_INFO_COLUMN_COUNT; i <= lastColumn; i++) {
                 sheet.setColumnWidth(i, styleConfig.getLevelTwoHeaderWidth());
             }
+        }
+
+        /**
+         * 获取行；不存在则创建，避免行高设置被跳过。
+         */
+        private Row getOrCreateRow(Sheet sheet, int rowIndex) {
+            Row row = sheet.getRow(rowIndex);
+            return row == null ? sheet.createRow(rowIndex) : row;
         }
     }
 

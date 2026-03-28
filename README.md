@@ -85,3 +85,26 @@ CREATE TABLE IF NOT EXISTS gantt_step_detail (
 >
 > `titleRowHeight`、`levelOneHeaderRowHeight`、`levelTwoHeaderRowHeight` 单位为 point；
 > `levelOneHeaderWidth`、`levelTwoHeaderWidth` 单位为“字符宽度”。
+
+### 请求字段说明
+
+| 字段 | 类型 | 必填 | 默认值 | 说明 |
+|---|---|---|---|---|
+| `title` | `String` | 否 | `Well Progress Gantt Chart` | 甘特图标题。导出时会自动拼接生成时间戳（UTC）。 |
+| `wellId` | `Long` | 是 | - | 井 ID，用于查询数据库中的阶段明细。 |
+| `titleFontSize` | `Short` | 否 | `16` | 第一行总标题字号。 |
+| `titleFontColor` | `String` | 否 | `WHITE` | 第一行总标题字体颜色（`IndexedColors` 枚举名）。 |
+| `titleBgColor` | `String` | 否 | `DARK_BLUE` | 第一行总标题背景色（`IndexedColors` 枚举名）。 |
+| `titleRowHeight` | `Float` | 否 | `28` | 第一行总标题行高。支持 point，也兼容 twips（如 `3000` -> `150pt`）。 |
+| `headerFontSize` | `Short` | 否 | `11` | 第二、三行表头字号。 |
+| `headerFontColor` | `String` | 否 | `WHITE` | 第二、三行表头字体颜色（`IndexedColors` 枚举名）。 |
+| `headerBgColor` | `String` | 否 | `GREY_50_PERCENT` | 第二、三行表头背景色（`IndexedColors` 枚举名）。 |
+| `levelOneHeaderRowHeight` | `Float` | 否 | `22` | 第二行（字段名/月份行）行高。支持 point，也兼容 twips。 |
+| `levelOneHeaderWidth` | `Integer` | 否 | `14` | 前四列（`Phase/Type/Start/End`）列宽，单位“字符宽度”。 |
+| `levelTwoHeaderRowHeight` | `Float` | 否 | `18` | 第三行（日号行）行高。支持 point，也兼容 twips。 |
+| `levelTwoHeaderWidth` | `Integer` | 否 | `4` | 时间轴日列列宽，单位“字符宽度”。 |
+
+### 时间戳说明
+
+- 下载文件名会追加导出时间戳（UTC），格式：`yyyyMMdd-HHmmss`，例如 `gantt-chart-20260328-120501.xlsx`。
+- Excel 第一行标题也会追加生成时间（UTC），格式：`yyyy-MM-dd HH:mm:ssZ`。

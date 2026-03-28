@@ -17,6 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -28,6 +31,9 @@ import java.util.List;
 @RequestMapping("/api/gantt")
 @RequiredArgsConstructor
 public class GanttExportController {
+
+    private static final DateTimeFormatter FILE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final DateTimeFormatter TITLE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'");
 
     /**
      * 导出服务。
@@ -48,7 +54,9 @@ public class GanttExportController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "wellId 不能为空");
         }
 
-        String fileName = URLEncoder.encode("gantt-chart", StandardCharsets.UTF_8)
+        LocalDateTime exportTime = LocalDateTime.now(ZoneOffset.UTC);
+        String timestamp = exportTime.format(FILE_TS_FORMAT);
+        String fileName = URLEncoder.encode("gantt-chart-" + timestamp, StandardCharsets.UTF_8)
                 .replaceAll("\\+", "%20");
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");
@@ -59,17 +67,18 @@ public class GanttExportController {
                 .titleFontSize(request.getTitleFontSize() == null ? 16 : request.getTitleFontSize())
                 .titleBgColor(parseColor(request.getTitleBgColor(), IndexedColors.DARK_BLUE.getIndex()))
                 .titleFontColor(parseColor(request.getTitleFontColor(), IndexedColors.WHITE.getIndex()))
-                .titleRowHeight(request.getTitleRowHeight() == null ? 28f : request.getTitleRowHeight())
+                .titleRowHeight(normalizeRowHeight(request.getTitleRowHeight(), 28f))
                 .headerFontSize(request.getHeaderFontSize() == null ? 11 : request.getHeaderFontSize())
-                .levelOneHeaderRowHeight(request.getLevelOneHeaderRowHeight() == null ? 22f : request.getLevelOneHeaderRowHeight())
-                .levelTwoHeaderRowHeight(request.getLevelTwoHeaderRowHeight() == null ? 18f : request.getLevelTwoHeaderRowHeight())
+                .levelOneHeaderRowHeight(normalizeRowHeight(request.getLevelOneHeaderRowHeight(), 22f))
+                .levelTwoHeaderRowHeight(normalizeRowHeight(request.getLevelTwoHeaderRowHeight(), 18f))
                 .headerBgColor(parseColor(request.getHeaderBgColor(), IndexedColors.GREY_50_PERCENT.getIndex()))
                 .headerFontColor(parseColor(request.getHeaderFontColor(), IndexedColors.WHITE.getIndex()))
                 .levelOneHeaderWidth(toExcelColumnWidth(request.getLevelOneHeaderWidth(), 14))
                 .levelTwoHeaderWidth(toExcelColumnWidth(request.getLevelTwoHeaderWidth(), 4))
                 .build();
 
-        ganttExportService.exportByWellId(response.getOutputStream(), request.getTitle(), request.getWellId(), style);
+        String exportTitle = request.getTitle() + " (generated at " + exportTime.format(TITLE_TS_FORMAT) + ")";
+        ganttExportService.exportByWellId(response.getOutputStream(), exportTitle, request.getWellId(), style);
     }
 
     /**
@@ -101,6 +110,36 @@ public class GanttExportController {
     }
 
     /**
+     * 规范化行高入参（输出单位：point）。
+     * <p>
+     * 前端常见两种传值方式：
+     * <ul>
+     *     <li>point：例如 28、22、18；</li>
+     *     <li>twips：例如 3000、2000（1 point = 20 twips）。</li>
+     * </ul>
+     * 这里兼容 twips：当值超过 Excel 行高上限 409.5 point 时，按 twips 自动换算。
+     * 同时兼容常见“看起来像 twips”的场景（如 200、300、400）：当值 >= 100 且为 10 的整数倍时，
+     * 默认也按 twips 处理（200 -> 10 point）。
+     */
+    private float normalizeRowHeight(Float rowHeight, float defaultPoint) {
+        if (rowHeight == null || rowHeight <= 0) {
+            return defaultPoint;
+        }
+        float excelMaxPoint = 409.5f;
+        if (rowHeight > excelMaxPoint) {
+            return rowHeight / 20f;
+        }
+        if (rowHeight >= 100f && isAlmostInteger(rowHeight) && ((int) Math.round(rowHeight)) % 10 == 0) {
+            return rowHeight / 20f;
+        }
+        return rowHeight;
+    }
+
+    private boolean isAlmostInteger(float value) {
+        return Math.abs(value - Math.round(value)) < 0.0001f;
+    }
+
+    /**
      * 导出请求体。
      */
     @Data
@@ -125,16 +164,16 @@ public class GanttExportController {
         /** 标题背景颜色（可选，IndexedColors 名称）。 */
         private String titleBgColor;
 
-        /** 标题行高度（可选，单位 point）。 */
+        /** 标题行高度（可选，单位 point；兼容 twips 入参）。 */
         private Float titleRowHeight;
 
         /** 表头字号（可选）。 */
         private Short headerFontSize;
 
-        /** 一级表头行高（可选，单位 point，作用于月份/字段名行）。 */
+        /** 一级表头行高（可选，单位 point；兼容 twips，作用于月份/字段名行）。 */
         private Float levelOneHeaderRowHeight;
 
-        /** 二级表头行高（可选，单位 point，作用于日号行）。 */
+        /** 二级表头行高（可选，单位 point；兼容 twips，作用于日号行）。 */
         private Float levelTwoHeaderRowHeight;
 
         /** 表头字体颜色（可选，IndexedColors 名称）。 */
