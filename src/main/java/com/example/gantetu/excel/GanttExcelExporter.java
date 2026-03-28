@@ -2,6 +2,7 @@ package com.example.gantetu.excel;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.write.handler.CellWriteHandler;
+import com.alibaba.excel.write.handler.RowWriteHandler;
 import com.alibaba.excel.write.handler.SheetWriteHandler;
 import com.alibaba.excel.write.metadata.holder.WriteSheetHolder;
 import com.alibaba.excel.write.metadata.holder.WriteTableHolder;
@@ -58,6 +59,7 @@ public class GanttExcelExporter {
         EasyExcel.write(outputStream)
                 .needHead(false)
                 .registerWriteHandler(new GanttSheetHandler(details, timelineContext, styleConfig))
+                .registerWriteHandler(new GanttRowHeightHandler(styleConfig))
                 .registerWriteHandler(new GanttCellHandler(details, timelineContext, styleConfig))
                 .sheet("Gantt")
                 .doWrite(rows);
@@ -253,14 +255,6 @@ public class GanttExcelExporter {
             // 冻结基础信息列与表头
             sheet.createFreezePane(BASE_INFO_COLUMN_COUNT, HEADER_ROWS);
 
-            // 标题行高度
-            Row titleRow = getOrCreateRow(sheet, 0);
-            titleRow.setHeightInPoints(styleConfig.getTitleRowHeight());
-            Row levelOneHeaderRow = getOrCreateRow(sheet, 1);
-            levelOneHeaderRow.setHeightInPoints(styleConfig.getLevelOneHeaderRowHeight());
-            Row levelTwoHeaderRow = getOrCreateRow(sheet, 2);
-            levelTwoHeaderRow.setHeightInPoints(styleConfig.getLevelTwoHeaderRowHeight());
-
             // 一级/二级表头列宽
             for (int i = 0; i < BASE_INFO_COLUMN_COUNT; i++) {
                 sheet.setColumnWidth(i, styleConfig.getLevelOneHeaderWidth());
@@ -269,13 +263,40 @@ public class GanttExcelExporter {
                 sheet.setColumnWidth(i, styleConfig.getLevelTwoHeaderWidth());
             }
         }
+    }
 
-        /**
-         * 获取行；不存在则创建，避免行高设置被跳过。
-         */
-        private Row getOrCreateRow(Sheet sheet, int rowIndex) {
-            Row row = sheet.getRow(rowIndex);
-            return row == null ? sheet.createRow(rowIndex) : row;
+    /**
+     * 行级处理器：在行创建完成后设置表头行高，避免被后续写入过程覆盖。
+     */
+    private static final class GanttRowHeightHandler implements RowWriteHandler {
+
+        private final GanttHeaderStyleConfig styleConfig;
+
+        private GanttRowHeightHandler(GanttHeaderStyleConfig styleConfig) {
+            this.styleConfig = styleConfig;
+        }
+
+        @Override
+        public void afterRowDispose(WriteSheetHolder writeSheetHolder,
+                                    WriteTableHolder writeTableHolder,
+                                    Row row,
+                                    Integer relativeRowIndex,
+                                    Boolean isHead) {
+            if (row == null) {
+                return;
+            }
+            int rowIndex = row.getRowNum();
+            if (rowIndex == 0) {
+                row.setHeightInPoints(styleConfig.getTitleRowHeight());
+                return;
+            }
+            if (rowIndex == 1) {
+                row.setHeightInPoints(styleConfig.getLevelOneHeaderRowHeight());
+                return;
+            }
+            if (rowIndex == 2) {
+                row.setHeightInPoints(styleConfig.getLevelTwoHeaderRowHeight());
+            }
         }
     }
 
