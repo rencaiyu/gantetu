@@ -16,7 +16,9 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
  * 甘特图 Excel 导出核心实现。
@@ -60,7 +62,7 @@ public class GanttExcelExporter {
                 .needHead(false)
                 .registerWriteHandler(new GanttSheetHandler(details, timelineContext, styleConfig))
                 .registerWriteHandler(new GanttRowHeightHandler(styleConfig))
-                .registerWriteHandler(new GanttCellHandler(details, timelineContext, styleConfig))
+                .registerWriteHandler(new GanttCellHandler(styleConfig))
                 .sheet("Gantt")
                 .doWrite(rows);
     }
@@ -228,6 +230,8 @@ public class GanttExcelExporter {
                                      WriteSheetHolder writeSheetHolder) {
             Sheet sheet = writeSheetHolder.getSheet();
             int lastColumn = BASE_INFO_COLUMN_COUNT + timelineContext.totalDays - 1;
+            int firstDataRow = HEADER_ROWS + 1;
+            int lastDataRow = HEADER_ROWS + details.size() * 2;
 
             // 标题横跨全列
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, lastColumn));
@@ -262,6 +266,57 @@ public class GanttExcelExporter {
             for (int i = BASE_INFO_COLUMN_COUNT; i <= lastColumn; i++) {
                 sheet.setColumnWidth(i, styleConfig.getLevelTwoHeaderWidth());
             }
+
+            // 数据区动态条件格式：
+            // 当用户在 Excel 中调整 C(Start)/D(End) 时，时间轴颜色会自动刷新。
+            if (!details.isEmpty() && timelineContext.totalDays > 0) {
+                applyDynamicRangeColorRules(sheet, firstDataRow, lastDataRow, lastColumn);
+            }
+        }
+
+        /**
+         * 使用条件格式实现动态区间着色（Plan 蓝色，Actual 红色）。
+         * <p>
+         * 规则基于每一行 C/D 列的日期值与时间轴列对应日期的比较，在 Excel 中修改后会自动重算颜色。
+         */
+        private void applyDynamicRangeColorRules(Sheet sheet,
+                                                 int firstDataRow,
+                                                 int lastDataRow,
+                                                 int lastColumn) {
+            SheetConditionalFormatting scf = sheet.getSheetConditionalFormatting();
+
+            String timelineStartExpr = String.format(
+                    "DATE(%d,%d,%d)+COLUMN()-%d",
+                    timelineContext.start.getYear(),
+                    timelineContext.start.getMonthValue(),
+                    timelineContext.start.getDayOfMonth(),
+                    BASE_INFO_COLUMN_COUNT + 1
+            );
+            String startExpr = "IF(ISNUMBER($C4),$C4,DATEVALUE($C4))";
+            String endExpr = "IF(ISNUMBER($D4),$D4,DATEVALUE($D4))";
+
+            String planFormula = String.format(
+                    "AND($B4=\"Plan\",%s>=%s,%s<=%s)",
+                    timelineStartExpr, startExpr, timelineStartExpr, endExpr
+            );
+            ConditionalFormattingRule planRule = scf.createConditionalFormattingRule(planFormula);
+            PatternFormatting planFormatting = planRule.createPatternFormatting();
+            planFormatting.setFillPattern(PatternFormatting.SOLID_FOREGROUND);
+            planFormatting.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+
+            String actualFormula = String.format(
+                    "AND($B4=\"Actual\",%s>=%s,%s<=%s)",
+                    timelineStartExpr, startExpr, timelineStartExpr, endExpr
+            );
+            ConditionalFormattingRule actualRule = scf.createConditionalFormattingRule(actualFormula);
+            PatternFormatting actualFormatting = actualRule.createPatternFormatting();
+            actualFormatting.setFillPattern(PatternFormatting.SOLID_FOREGROUND);
+            actualFormatting.setFillForegroundColor(IndexedColors.ROSE.getIndex());
+
+            CellRangeAddress[] regions = {
+                    new CellRangeAddress(firstDataRow - 1, lastDataRow - 1, BASE_INFO_COLUMN_COUNT, lastColumn)
+            };
+            scf.addConditionalFormatting(regions, planRule, actualRule);
         }
     }
 
@@ -305,14 +360,6 @@ public class GanttExcelExporter {
      */
     private static final class GanttCellHandler implements CellWriteHandler {
 
-        /**
-         * 行号到区间定义的映射（用于快速判断某单元格是否命中计划/实际区间）。
-         */
-        private final Map<Integer, RowTypeRange> rowRangeMap = new HashMap<>();
-
-        /** 时间轴上下文。 */
-        private final TimelineContext timelineContext;
-
         /** 颜色/字号配置。 */
         private final GanttHeaderStyleConfig styleConfig;
 
@@ -320,29 +367,8 @@ public class GanttExcelExporter {
         private CellStyle headerStyle;
         private CellStyle dayHeaderStyle;
         private CellStyle bodyStyle;
-        private CellStyle planFillStyle;
-        private CellStyle actualFillStyle;
-
-        private GanttCellHandler(List<GanttChartOfWellProgressDetail> details,
-                                 TimelineContext timelineContext,
-                                 GanttHeaderStyleConfig styleConfig) {
-            this.timelineContext = timelineContext;
+        private GanttCellHandler(GanttHeaderStyleConfig styleConfig) {
             this.styleConfig = styleConfig;
-
-            // 预计算每行对应的时间范围，避免逐单元格重复解析。
-            for (int i = 0; i < details.size(); i++) {
-                int planRow = HEADER_ROWS + i * 2;
-                int actualRow = planRow + 1;
-                GanttChartOfWellProgressDetail detail = details.get(i);
-                rowRangeMap.put(planRow, buildRowTypeRange(
-                        true,
-                        toLocalDate(detail.getPlanStartDate()),
-                        toLocalDate(detail.getPlanEndDate())));
-                rowRangeMap.put(actualRow, buildRowTypeRange(
-                        false,
-                        toLocalDate(detail.getActualStartDate()),
-                        toLocalDate(detail.getActualEndDate())));
-            }
         }
 
         @Override
@@ -379,21 +405,7 @@ public class GanttExcelExporter {
                 return;
             }
 
-            RowTypeRange rowTypeRange = rowRangeMap.get(row);
-            if (rowTypeRange == null || rowTypeRange.start == null || rowTypeRange.end == null) {
-                cell.setCellStyle(bodyStyle);
-                return;
-            }
-
-            // 根据列计算当前日期，判断是否处于区间内
-            LocalDate thisDate = timelineContext.start.plusDays(col - BASE_INFO_COLUMN_COUNT);
-            boolean inRange = !thisDate.isBefore(rowTypeRange.start)
-                    && !thisDate.isAfter(rowTypeRange.end);
-            if (inRange) {
-                cell.setCellStyle(rowTypeRange.plan ? planFillStyle : actualFillStyle);
-            } else {
-                cell.setCellStyle(bodyStyle);
-            }
+            cell.setCellStyle(bodyStyle);
         }
 
         /** 延迟初始化样式，避免重复创建对象。 */
@@ -418,16 +430,6 @@ public class GanttExcelExporter {
                     false);
             bodyStyle = createBaseStyle(workbook,
                     IndexedColors.WHITE.getIndex(),
-                    IndexedColors.BLACK.getIndex(),
-                    (short) 10,
-                    false);
-            planFillStyle = createBaseStyle(workbook,
-                    IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex(),
-                    IndexedColors.BLACK.getIndex(),
-                    (short) 10,
-                    false);
-            actualFillStyle = createBaseStyle(workbook,
-                    IndexedColors.ROSE.getIndex(),
                     IndexedColors.BLACK.getIndex(),
                     (short) 10,
                     false);
@@ -462,47 +464,5 @@ public class GanttExcelExporter {
             return cellStyle;
         }
 
-        /**
-         * 将 Date 转换为系统时区下的 LocalDate。
-         */
-        private LocalDate toLocalDate(Date date) {
-            if (date == null) {
-                return null;
-            }
-            return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        }
-
-        /**
-         * 构建行区间：
-         * - 若仅有开始或结束日期，则按单天区间渲染；
-         * - 若起止颠倒，则自动交换，避免区间判断失败。
-         */
-        private RowTypeRange buildRowTypeRange(boolean plan, LocalDate start, LocalDate end) {
-            if (start == null && end == null) {
-                return new RowTypeRange(plan, null, null);
-            }
-            if (start == null) {
-                start = end;
-            }
-            if (end == null) {
-                end = start;
-            }
-            if (start.isAfter(end)) {
-                LocalDate temp = start;
-                start = end;
-                end = temp;
-            }
-            return new RowTypeRange(plan, start, end);
-        }
-
-        /**
-         * 行类型与日期区间定义。
-         *
-         * @param plan  是否计划行（true=Plan, false=Actual）
-         * @param start 区间开始日期
-         * @param end   区间结束日期
-         */
-        private record RowTypeRange(boolean plan, LocalDate start, LocalDate end) {
-        }
     }
 }
