@@ -25,7 +25,7 @@ import java.util.List;
 /**
  * 甘特图导出控制器。
  * <p>
- * 提供 HTTP 接口接收导出参数，构建样式配置，并将生成的 Excel 作为附件流式返回。
+ * 对外暴露 HTTP 接口，负责接收导出参数、组装样式配置，并将生成的 Excel 以附件形式返回。
  */
 @RestController
 @RequestMapping("/api/gantt")
@@ -36,16 +36,16 @@ public class GanttExportController {
     private static final DateTimeFormatter TITLE_TS_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss'Z'");
 
     /**
-     * 导出服务。
+     * 业务导出服务。
      */
     private final GanttExportService ganttExportService;
 
     /**
      * 导出甘特图 Excel。
      *
-     * @param request  导出请求（标题、井 ID、颜色与字号配置）
+     * @param request 导出请求，包含标题、井 ID 和样式参数
      * @param response HTTP 响应对象
-     * @throws IOException 写出响应流时可能抛出 IO 异常
+     * @throws IOException 写出响应流时可能抛出的异常
      */
     @PostMapping("/export")
     public void export(@RequestBody GanttExportRequest request,
@@ -82,12 +82,10 @@ public class GanttExportController {
     }
 
     /**
-     * 将字符串颜色名转换为 Apache POI 颜色索引。
-     * <p>
-     * 示例输入：DARK_BLUE、WHITE、GREY_50_PERCENT。
+     * 将颜色名称转换为 Apache POI 颜色索引。
      *
-     * @param colorName    颜色名称
-     * @param defaultColor 默认颜色索引（当 colorName 为空或非法时使用）
+     * @param colorName 颜色名称，例如 `DARK_BLUE`
+     * @param defaultColor 默认颜色索引
      * @return 颜色索引
      */
     private short parseColor(String colorName, short defaultColor) {
@@ -110,16 +108,11 @@ public class GanttExportController {
     }
 
     /**
-     * 规范化行高入参（输出单位：point）。
+     * 规范化行高入参，统一输出为 point。
      * <p>
-     * 前端常见两种传值方式：
-     * <ul>
-     *     <li>point：例如 28、22、18；</li>
-     *     <li>twips：例如 3000、2000（1 point = 20 twips）。</li>
-     * </ul>
-     * 这里兼容 twips：当值超过 Excel 行高上限 409.5 point 时，按 twips 自动换算。
-     * 同时兼容常见“看起来像 twips”的场景（如 200、300、400）：当值 >= 100 且为 10 的整数倍时，
-     * 默认也按 twips 处理（200 -> 10 point）。
+     * 兼容两类输入：
+     * 1. 直接传 point，例如 `28`
+     * 2. 传 twips，例如 `560`，会自动换算成 `28pt`
      */
     private float normalizeRowHeight(Float rowHeight, float defaultPoint) {
         if (rowHeight == null || rowHeight <= 0) {
@@ -135,6 +128,9 @@ public class GanttExportController {
         return rowHeight;
     }
 
+    /**
+     * 判断浮点值是否足够接近整数，避免 twips 识别时受精度误差影响。
+     */
     private boolean isAlmostInteger(float value) {
         return Math.abs(value - Math.round(value)) < 0.0001f;
     }
@@ -148,44 +144,44 @@ public class GanttExportController {
         /** 甘特图标题。 */
         private String title = "Well Progress Gantt Chart";
 
-        /** 井 ID（用于从数据库查询甘特图步骤明细）。 */
+        /** 井 ID，用于从数据库查询步骤明细。 */
         private Long wellId;
 
-        /** 兼容历史接口保留字段（已废弃，不再用于导出）。 */
+        /** 兼容历史接口保留字段，已废弃，不再参与导出。 */
         @Deprecated
         private List<GanttChartOfWellProgressDetail> details;
 
-        /** 标题字号（可选）。 */
+        /** 标题字号。 */
         private Short titleFontSize;
 
-        /** 标题字体颜色（可选，IndexedColors 名称）。 */
+        /** 标题字体颜色，使用 `IndexedColors` 名称。 */
         private String titleFontColor;
 
-        /** 标题背景颜色（可选，IndexedColors 名称）。 */
+        /** 标题背景颜色，使用 `IndexedColors` 名称。 */
         private String titleBgColor;
 
-        /** 标题行高度（可选，单位 point；兼容 twips 入参）。 */
+        /** 标题行高，支持 point，也兼容 twips。 */
         private Float titleRowHeight;
 
-        /** 表头字号（可选）。 */
+        /** 表头字号。 */
         private Short headerFontSize;
 
-        /** 一级表头行高（可选，单位 point；兼容 twips，作用于月份/字段名行）。 */
+        /** 一级表头行高，作用于月份行和固定字段行。 */
         private Float levelOneHeaderRowHeight;
 
-        /** 二级表头行高（可选，单位 point；兼容 twips，作用于日号行）。 */
+        /** 二级表头行高，作用于日号行。 */
         private Float levelTwoHeaderRowHeight;
 
-        /** 表头字体颜色（可选，IndexedColors 名称）。 */
+        /** 表头字体颜色，使用 `IndexedColors` 名称。 */
         private String headerFontColor;
 
-        /** 表头背景颜色（可选，IndexedColors 名称）。 */
+        /** 表头背景颜色，使用 `IndexedColors` 名称。 */
         private String headerBgColor;
 
-        /** 一级表头列宽（可选，单位字符，作用于 Phase/Type/Start/End 列）。 */
+        /** 一级表头列宽，作用于 `Phase/Type/Start/End`。 */
         private Integer levelOneHeaderWidth;
 
-        /** 二级表头列宽（可选，单位字符，作用于时间轴日列）。 */
+        /** 二级表头列宽，作用于时间轴日列。 */
         private Integer levelTwoHeaderWidth;
     }
 }

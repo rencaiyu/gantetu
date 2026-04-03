@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * 甘特图步骤数据查询服务。
+ * 甘特图步骤查询服务。
  */
 @Service
 @RequiredArgsConstructor
@@ -19,7 +19,7 @@ public class GanttDetailQueryService {
     private final GanttStepDetailMapper ganttStepDetailMapper;
 
     /**
-     * 根据井 ID 查询甘特图步骤明细。
+     * 根据井 ID 查询甘特图步骤明细，并转换为导出 DTO。
      *
      * @param wellId 井 ID
      * @return 导出 DTO 列表
@@ -36,6 +36,9 @@ public class GanttDetailQueryService {
                 .toList();
     }
 
+    /**
+     * 将数据库实体转换为导出使用的 DTO，避免导出层依赖持久化对象。
+     */
     private GanttChartOfWellProgressDetail toDto(GanttStepDetailEntity entity) {
         GanttChartOfWellProgressDetail dto = new GanttChartOfWellProgressDetail();
         dto.setPhase(entity.getPhase());

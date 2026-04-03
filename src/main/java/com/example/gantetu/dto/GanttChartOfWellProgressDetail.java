@@ -7,17 +7,17 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * 甘特图单个步骤的数据传输对象。
+ * 单个甘特图阶段的导出 DTO。
  * <p>
- * 每个步骤同时包含计划时间段与实际时间段，导出时会渲染为两行（Plan / Actual）。
+ * 一个阶段同时携带计划与实际两个时间段，导出时会拆成 `Plan` 和 `Actual` 两行。
  */
 @Data
 public class GanttChartOfWellProgressDetail {
 
     /**
-     * 步骤名称（例如：钻井、完井、测试等）。
+     * 阶段名称，例如钻井、完井、测试。
      */
-    @Schema(description = "步骤")
+    @Schema(description = "阶段")
     private String phase;
 
     /**
